@@ -52,52 +52,23 @@ export default function App() {
   const [calculation, setCalculation] = useState<any>(null);
   const [topUpAmount, setTopUpAmount] = useState<string>('');
 
-  // Persistence Logic: Load from LocalStorage
+  // Persistence Logic: Load from LocalStorage (Only for UI preferences)
   useEffect(() => {
-    const savedProducts = localStorage.getItem('booking_products');
-    const savedOrders = localStorage.getItem('booking_orders');
-    const savedPurchases = localStorage.getItem('booking_purchases');
-    const savedBalance = localStorage.getItem('booking_balance');
     const savedCopied = localStorage.getItem('booking_copied_ids');
-
     if (savedCopied) {
       setCopiedIds(new Set(JSON.parse(savedCopied)));
     }
-
-    if (savedProducts && savedOrders && savedPurchases && savedBalance) {
-      setProducts(JSON.parse(savedProducts));
-      setOrders(JSON.parse(savedOrders));
-      setPurchases(JSON.parse(savedPurchases));
-      setBalance(JSON.parse(savedBalance));
-      setLoading(false);
-    } else {
-      // Seed from API if local storage is empty
-      fetchData();
-    }
+    fetchData();
+    
+    // Auto-refresh every 10 seconds
+    const interval = setInterval(() => fetchData(true), 10000);
+    return () => clearInterval(interval);
   }, []);
 
-  // Save to LocalStorage whenever data changes
+  // Save UI preferences to LocalStorage
   useEffect(() => {
-    if (!loading) {
-      localStorage.setItem('booking_products', JSON.stringify(products));
-      localStorage.setItem('booking_orders', JSON.stringify(orders));
-      localStorage.setItem('booking_purchases', JSON.stringify(purchases));
-      if (balance) localStorage.setItem('booking_balance', JSON.stringify(balance));
-      localStorage.setItem('booking_copied_ids', JSON.stringify(Array.from(copiedIds)));
-      
-      // Update Stats
-      const active = orders.filter(o => o.status === 'active').length;
-      const completed = orders.filter(o => o.status === 'completed').length;
-      const totalItems = purchases.length;
-      setStats({
-        total_orders: orders.length,
-        active_orders: active,
-        completed_orders: completed,
-        total_purchases: purchases.length,
-        total_items_purchased: totalItems
-      });
-    }
-  }, [products, orders, purchases, balance, copiedIds, loading]);
+    localStorage.setItem('booking_copied_ids', JSON.stringify(Array.from(copiedIds)));
+  }, [copiedIds]);
 
   const fetchData = async (silent = false) => {
     if (!silent) setIsRefreshing(true);
@@ -142,62 +113,56 @@ export default function App() {
       return;
     }
 
-    const newOrder: Order = {
-      id: `order_${Math.random().toString(36).substr(2, 9)}`,
-      product_id: productId,
-      product_name: product.name,
-      quantity_requested: quantity,
-      quantity_purchased: 0,
-      status: 'active',
-      created_at: new Date().toLocaleString('en-US')
-    };
-
-    setOrders(prev => [newOrder, ...prev]);
-    setBalance(prev => prev ? { ...prev, balance: prev.balance - (product.cost * quantity) } : null);
-    
-    // Reset quantity for this product
-    setProductQuantities(prev => ({ ...prev, [productId]: 1 }));
-    
-    setActiveTab('orders');
-
-    // Simulate progress
-    setTimeout(() => {
-      processOrder(newOrder.id);
-    }, 1500);
-  };
-
-  const processOrder = (orderId: string) => {
-    setOrders(prev => prev.map(order => {
-      if (order.id === orderId && order.status === 'active') {
-        const nextQty = order.quantity_purchased + 1;
-        if (nextQty <= order.quantity_requested) {
-          // Create a purchase
-          const newPurchase: Purchase = {
-            id: Math.floor(Math.random() * 1000000),
-            order_id: orderId,
-            product_id: order.product_id,
-            serial_code: `SN-${Math.random().toString(36).toUpperCase().substr(0, 12)}`,
-            serial_number: `${Math.floor(Math.random() * 1000000000)}`,
-            decrypted_code: `${Math.random().toString(36).toUpperCase().substr(0, 16)}`,
-            status: 'success',
-            created_at: new Date().toLocaleString('en-US')
-          };
-          setPurchases(p => [newPurchase, ...p]);
-          
-          const isDone = nextQty === order.quantity_requested;
-          return { ...order, quantity_purchased: nextQty, status: isDone ? 'completed' : 'active' };
-        }
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product_id: productId, quantity })
+      });
+      const data = await res.json();
+      if (data.success) {
+        // Reset quantity for this product
+        setProductQuantities(prev => ({ ...prev, [productId]: 1 }));
+        setActiveTab('orders');
+        fetchData(true);
+      } else {
+        setError(data.message || 'فشل في إنشاء الطلب');
       }
-      return order;
-    }));
+    } catch (error) {
+      console.error('Error creating order:', error);
+      setError('حدث خطأ أثناء الاتصال بالخادم');
+    }
   };
 
-  const handleUpdateStatus = (orderId: string, status: string) => {
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: status as any } : o));
+  const handleUpdateStatus = async (orderId: string, status: string) => {
+    try {
+      const res = await fetch(`/api/orders/${orderId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      const data = await res.json();
+      if (data.success) {
+        fetchData(true);
+      }
+    } catch (error) {
+      console.error('Error updating status:', error);
+    }
   };
 
-  const handleDeleteOrder = (orderId: string) => {
-    setOrders(prev => prev.filter(o => o.id !== orderId));
+  const handleDeleteOrder = async (orderId: string) => {
+    if (!window.confirm('هل أنت متأكد من حذف هذا الطلب؟')) return;
+    try {
+      const res = await fetch(`/api/orders/${orderId}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (data.success) {
+        fetchData(true);
+      }
+    } catch (error) {
+      console.error('Error deleting order:', error);
+    }
   };
 
   const handleCopy = (text: string, id: string | number) => {
