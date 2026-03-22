@@ -9,7 +9,7 @@ const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
-  const PORT = 4040;
+  const PORT = 3000;
 
   app.use(express.json());
 
@@ -37,6 +37,18 @@ async function startServer() {
   app.post("/api/orders", async (req, res) => {
     try {
       const response = await axios.post(`${API_URL}/orders`, req.body);
+      res.json(response.data);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/orders", async (req, res) => {
+    try {
+      const { status } = req.query;
+      let url = `${API_URL}/orders`;
+      if (status) url += `?status=${status}`;
+      const response = await axios.get(url);
       res.json(response.data);
     } catch (error: any) {
       res.status(500).json({ error: error.message });

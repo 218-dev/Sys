@@ -81,11 +81,11 @@ export default function App() {
         fetch('/api/purchases').then(r => r.json())
       ]);
 
-      setStats(statsRes.stats);
-      setBalance(balanceRes);
-      setProducts(productsRes.products);
-      setOrders(ordersRes.orders);
-      setPurchases(purchasesRes.purchases);
+      setStats(statsRes?.stats || null);
+      setBalance(balanceRes || null);
+      setProducts(productsRes?.products || []);
+      setOrders(ordersRes?.orders || []);
+      setPurchases(purchasesRes?.purchases || []);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -294,7 +294,7 @@ export default function App() {
             <div>
               <p className="text-[11px] font-black text-emerald-600/60 uppercase tracking-[0.2em] mb-1">الرصيد المتاح</p>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-black text-emerald-950 tracking-tight">{balance?.balance.toLocaleString()}</span>
+                <span className="text-3xl font-black text-emerald-950 tracking-tight">{balance?.balance?.toLocaleString() || '0'}</span>
                 <span className="text-sm font-bold text-emerald-600/40">{balance?.currency}</span>
               </div>
             </div>
@@ -374,7 +374,7 @@ export default function App() {
                     <Activity className="w-5 h-5 text-emerald-300 animate-pulse" />
                   </div>
                   <div className="space-y-4">
-                    {orders.slice(0, 4).map((order, i) => (
+                    {orders?.slice(0, 4).map((order, i) => (
                       <motion.div 
                         key={order.id} 
                         initial={{ opacity: 0, x: 20 }}
@@ -387,7 +387,7 @@ export default function App() {
                           <span className="text-sm font-bold text-emerald-900 line-clamp-1">{order.product_name}</span>
                         </div>
                         <div className="flex items-center gap-3">
-                          <span className="text-[11px] font-black text-emerald-600/40 font-mono">{order.created_at.split(' ')[1]}</span>
+                          <span className="text-[11px] font-black text-emerald-600/40 font-mono">{order.created_at?.split(' ')[1] || order.created_at}</span>
                           <ChevronLeft className="w-4 h-4 text-emerald-200" />
                         </div>
                       </motion.div>
@@ -676,11 +676,11 @@ export default function App() {
                       <div className="grid grid-cols-2 gap-5">
                         <div className="p-5 bg-emerald-50 rounded-2xl border border-emerald-100">
                           <p className="text-[11px] font-black text-emerald-600/40 uppercase mb-2">المتاح</p>
-                          <p className="text-2xl font-black text-emerald-950 tracking-tight">${calculation.available_balance.toLocaleString()}</p>
+                          <p className="text-2xl font-black text-emerald-950 tracking-tight">${calculation?.available_balance?.toLocaleString() || '0'}</p>
                         </div>
                         <div className="p-5 bg-amber-50 rounded-2xl border border-amber-100">
                           <p className="text-[11px] font-black text-amber-600/40 uppercase mb-2">المحجوز</p>
-                          <p className="text-2xl font-black text-amber-900 tracking-tight">${calculation.reserve_amount.toLocaleString()}</p>
+                          <p className="text-2xl font-black text-amber-900 tracking-tight">${calculation?.reserve_amount?.toLocaleString() || '0'}</p>
                         </div>
                       </div>
                       <div className="bg-white rounded-2xl border border-emerald-100 divide-y divide-emerald-50 overflow-hidden">
